@@ -15,8 +15,10 @@ backend = BasicAer.get_backend('qasm_simulator')
 job = execute(qr, backend)
 plot_histogram(job.result().get_counts(), color='midnightblue', title="3(011)+2(010)=5(101)")
 ```
-The results are obtained for a simulation (left) and for a real device (right)(London) using IBMQ.
+The results are obtained for a simulation (left) and for a real device (right)(London) using IBMQ. Error of real devices can be clearly observed.
+
 ![alt text](https://github.com/juandaanieel/Shor/blob/master/3p2.png)
+
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
