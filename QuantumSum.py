@@ -11,6 +11,8 @@ from qiskit.quantum_info import Statevector
 
 #Functions for the QFT
 #Taken from qiskit textbook
+#https://qiskit.org/textbook/ch-algorithms/quantum-fourier-transform.html
+
 def qft_rotations(circuit, n):
     """Performs qft on the first n qubits in circuit (without swaps)"""
     if n == 0:
@@ -44,56 +46,45 @@ def qftdag(circuit, n):
         circuit.h(j)
     return circuit
 
-#We want to implement the sum operation of two numbers a and b. We do following the method described in
-#ArXiv:
+#Initally, we want to implement the sum operation of two numbers a and b. We do following the method described in ArXiv: https://arxiv.org/abs/quant-ph/0205095
 
-def getPhases(binary,N):
+def getPhases(binary):
     """Transform a to a set of phase shitf operations in Fourier space"""
     phases = []
-    
     for j in range(len(binary)):
         phases.append([])
-        for i in range(len(binary)-j):
-            if binary[i+j] == '1':
-                phases[j].append(2**(i))
-                
+        for i in range(j,len(binary)):
+            if binary[i] == '1':
+                phases[j].append(2**(i-j))           
     return phases
 
-def applyPhases(qr,phases):
-    """Apply phase shift of a to b"""
-    for i in range(len(phases)):
+def applyPhases(N,phases,inv,ctrl,ctrlq):
+    """Several options can be included in the application of the sum phases. The inv(0 or 1) and ctrl(bool) variables control if we do sum or substraction, and if we do a controled or normal operation, respectively."""
+    qr = QuantumCircuit(N)
+    for i in range(N):
         for j in range(len(phases[i])):
-            qr.u1(-pi/float(phases[i][j]),i)
+            if ctrl:
+                qr.u1((-1)**inv * pi/float(phases[i][j]),i)
+            else:
+                qr.cu1((-1)**inv * pi/float(phases[i][j]),ctrlq,i)
+    #print(qr)
     return qr
 
-
-def Qsum(qr,abin):
-    """Sum a to b"""
-    return applyPhases(qr,getPhases(abin,len(abin)))
+def Q_sum(N,abin,inv,ctrl,ctrlq):
+    return applyPhases(N,getPhases(abin),inv,ctrl,ctrlq)
 
 
-def getBitString(a,b):
-    """
-    This function gives proper binary string for the numbers to sum, 
-    and includes an extra zero bit to avoid overflowing.
-    """
+def abstrings(a,b):
     
-    #Two binary string with an extra zero bit to avoid overflowing
-    ab = '0'
-    bb = '0'
-    
-    #Same bit number for a and b strings
-    diff = len(format(b,'b')) - len(format(a,'b'))
-    if diff>0:
-        ab += diff*'0'
-    else:
-        bb += diff*'0'
-    
-    #Add binary strings at the end
-    ab += format(a,'b')
-    bb += format(b,'b')
-    
-    return [ab,bb]
+    if len(a) != len(b):
+        m = max(len(a),len(b))
+        a = '0'*(m-len(a)) + a
+        b = '0'*(m-len(b)) + b
+        
+    a = '0'+a
+    b = '0'+b
+        
+    return a,b
 
 def initializeQ(qr,binary):
     """This function initializes the quantum register with b"""
@@ -103,41 +94,23 @@ def initializeQ(qr,binary):
     return qr
 
 #Sum algorithm
-def sumQFT(a,b):
+def sumQFT(a,inv,ctrl,ctrlq):
+    
     """
-        Sum operation of two binary numbers a and b. The steps[1] are:
-
-        Precompute a as a phase shift:
-
-        a) Since a is know (classical), we compute the phases added by a controled-a operations.
-        b) Then we generate the set of single gate phase operations obtained in (1)
-
+        Sum operation of two binary numbers a and b.
+        
         Algorithm:
-
-        1) Prepare a quantum register initialized to the bin rep of b
-        2) Apply a QFT to the quantum register
-        3) Apply the single q gates from (a) and (b)
-        4) Apply QFT dagger to the quantum register
-
+        1) Apply a QFT to the quantum register previously initialized to b
+        2) Apply the single q gates from a (classical number)
+        3) Apply QFT dagger to the quantum register
     """
 
-    binaries = getBitString(a,b)
-    N = len(binaries[0])
+    N = len(a)
 
-    qr = QuantumCircuit(N,N)
-    #We do the case b=0='0...0'
-    qr = initializeQ(qr,binaries[1])
-    qr.barrier()
-    qr = qftdag(qr,N)
-    qr.barrier()
-    qr = Qsum(qr,binaries[0])
-    qr.barrier()
-    qr = qft(qr,N)
-    qr.barrier()
-
-    for i in range(N):
-        qr.measure(i,i)
-
+    qr = QuantumCircuit(N)
+    qr.append(qft(N),range(N))
+    qr.append(Q_sum(N,a,inv,ctrl,ctrlq),range(N))
+    qr.append(qftdag(N),range(N))
     return qr
 
 
